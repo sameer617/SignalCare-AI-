@@ -216,3 +216,19 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Project-specific ignores
+HOPE_WSDM_2022/
+Project Progress- SignalCare AI.docx
+SignalCareAI Project.pdf
+
+# Generated data and model artifacts (never commit)
+processed/
+models/
+src/train_risk_signals.csv
+src/validation_risk_signals.csv
+src/test_risk_signals.csv
+
+# Claude Code memory (local only)
+.claude/settings.local.json
+.claude/projects/

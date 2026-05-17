@@ -1,0 +1,240 @@
+{
+  "version": "1.0",
+  "description": "Canonical definitions for SignalCare AI distress signals. Keep in sync with RiskSignal enum in src/risk_taxonomy.py.",
+  "signals": [
+    {
+      "code": "S01",
+      "enum_value": "S01_hopelessness_escalation",
+      "name": "Hopelessness escalation",
+      "severity": "High",
+      "definition": "Patient language expresses a growing or intensifying belief that their situation cannot improve, that the future holds no positive possibilities, or that effort is futile.",
+      "example_cues": [
+        "\"There's no point anymore.\"",
+        "\"Nothing is ever going to change.\"",
+        "\"I've tried everything — it doesn't matter.\""
+      ],
+      "notes": "Look for escalation across turns, not just a single utterance. Distinguish from momentary frustration."
+    },
+    {
+      "code": "S02",
+      "enum_value": "S02_catastrophizing",
+      "name": "Catastrophizing",
+      "severity": "Medium",
+      "definition": "Patient consistently expects the worst possible outcome from situations, often magnifying the perceived consequences of events far beyond what evidence supports.",
+      "example_cues": [
+        "\"If I fail this test, my life is over.\"",
+        "\"Everything is going to fall apart.\"",
+        "\"This is a complete disaster.\""
+      ],
+      "notes": "Distinguish from realistic concern. Catastrophizing involves disproportionate escalation to worst-case thinking."
+    },
+    {
+      "code": "S03",
+      "enum_value": "S03_all_or_nothing_thinking",
+      "name": "All-or-nothing thinking",
+      "severity": "Low",
+      "definition": "Patient frames situations, self-assessment, or outcomes in absolute binary terms, without acknowledging nuance or middle ground.",
+      "example_cues": [
+        "\"I'm a total failure.\"",
+        "\"If it's not perfect, it's worthless.\"",
+        "\"Either I do it right or there's no point.\""
+      ],
+      "notes": "Also known as black-and-white thinking. Look for absolute language: always, never, everyone, no one, completely, totally."
+    },
+    {
+      "code": "S04",
+      "enum_value": "S04_self_blame_amplification",
+      "name": "Self-blame amplification",
+      "severity": "Medium",
+      "definition": "Patient attributes negative events excessively to personal failings, taking on disproportionate responsibility for outcomes that involve other factors.",
+      "example_cues": [
+        "\"It's all my fault.\"",
+        "\"If I were better, this wouldn't have happened.\"",
+        "\"I ruined everything.\""
+      ],
+      "notes": "Distinguish from appropriate accountability. Self-blame amplification is disproportionate and global."
+    },
+    {
+      "code": "S05",
+      "enum_value": "S05_emotional_volatility",
+      "name": "Emotional volatility",
+      "severity": "Medium",
+      "definition": "Patient describes or displays rapid, intense swings in emotional state within a session or across recent experiences — from calm to despair, anger, or panic with little provocation.",
+      "example_cues": [
+        "Sudden tearfulness after appearing composed.",
+        "\"One minute I'm fine and then I just crash.\"",
+        "Reported mood swings within a single day."
+      ],
+      "notes": "Temporal signal — requires multi-turn context to detect shifts. Not the same as expressing a strong emotion once."
+    },
+    {
+      "code": "S06",
+      "enum_value": "S06_social_withdrawal_language",
+      "name": "Social withdrawal language",
+      "severity": "Low",
+      "definition": "Patient expresses desire to isolate, describes cutting off social contact, or reports actively avoiding relationships or interactions.",
+      "example_cues": [
+        "\"I just don't want to see anyone.\"",
+        "\"I've been staying home and ignoring calls.\"",
+        "\"People just make things worse.\""
+      ],
+      "notes": "Focus on the withdrawal intent or behavior, not just introversion. Social withdrawal is a behavioral pattern, not a personality trait."
+    },
+    {
+      "code": "S07",
+      "enum_value": "S07_helplessness_loss_of_agency",
+      "name": "Helplessness / loss of agency",
+      "severity": "Medium",
+      "definition": "Patient expresses belief that they have no control over their situation, that outcomes are determined entirely by external forces, or that their actions cannot make a difference.",
+      "example_cues": [
+        "\"There's nothing I can do.\"",
+        "\"It doesn't matter what I try.\"",
+        "\"Other people decide everything in my life.\""
+      ],
+      "notes": "Related to S01 but distinct — helplessness is about perceived lack of control; hopelessness is about perceived lack of future. Both can co-occur."
+    },
+    {
+      "code": "S08",
+      "enum_value": "S08_negative_sentiment_trend",
+      "name": "Negative sentiment trend",
+      "severity": "Medium",
+      "definition": "The overall emotional tone of the patient's utterances trends consistently negative across the session — not a single low point, but a sustained or worsening emotional trajectory.",
+      "example_cues": [
+        "Session begins neutral or mildly negative and becomes progressively darker.",
+        "Patient responds to positive reframes with continued negativity.",
+        "Cumulative weight of pessimistic statements across many turns."
+      ],
+      "notes": "Temporal/aggregate signal — must be assessed across multiple turns, not a single utterance. Requires session-level view."
+    },
+    {
+      "code": "S09",
+      "enum_value": "S09_rumination_patterns",
+      "name": "Rumination patterns",
+      "severity": "Low",
+      "definition": "Patient repeatedly returns to the same distressing thought, memory, or concern across multiple turns without progressing toward resolution, suggesting a stuck cognitive loop.",
+      "example_cues": [
+        "Repeating the same worry or grievance across turns.",
+        "\"I keep thinking about it over and over.\"",
+        "Patient circles back to the same topic after the therapist redirects."
+      ],
+      "notes": "Temporal signal — must be observed across turns. A single mention is not rumination."
+    },
+    {
+      "code": "S10",
+      "enum_value": "S10_emotional_numbing",
+      "name": "Emotional numbing",
+      "severity": "Low",
+      "definition": "Patient reports or displays a flattened, disconnected, or absent emotional response — feeling nothing, feeling detached from their own experience, or describing themselves as 'empty' or 'blank'.",
+      "example_cues": [
+        "\"I don't feel anything anymore.\"",
+        "\"I'm just going through the motions.\"",
+        "\"I know I should be upset but I'm not.\""
+      ],
+      "notes": "Distinct from depression's sadness — numbing is the absence of feeling rather than negative feeling. Can co-occur with S01."
+    },
+    {
+      "code": "S11",
+      "enum_value": "S11_cognitive_distortion_density",
+      "name": "Cognitive distortion density",
+      "severity": "Medium",
+      "definition": "Patient's language contains a high concentration of cognitive distortions — multiple distortion types (from S02, S03, S04, S07, S09, S10) appearing within a short span of utterances.",
+      "example_cues": [
+        "Single utterance with catastrophizing + all-or-nothing + self-blame.",
+        "Multiple distortion types across adjacent turns.",
+        "Distortions appear in most patient turns of the session."
+      ],
+      "notes": "Density meta-signal — fires when distortions cluster, indicating pervasive distorted thinking rather than isolated instances."
+    },
+    {
+      "code": "S12",
+      "enum_value": "S12_escalation_risk_composite",
+      "name": "Escalation risk composite",
+      "severity": "High",
+      "definition": "Composite meta-signal that fires when multiple high-severity or temporally escalating signals co-occur in a single session, indicating elevated overall risk that warrants closer clinical attention.",
+      "example_cues": [
+        "S01 + S13 co-occurring.",
+        "S07 + S08 trend + S04 in same session.",
+        "Three or more signals from the High/Medium severity tier in one session."
+      ],
+      "notes": "Never fire S12 based on a single signal alone. It requires multi-signal co-occurrence. S12 is a flag for counselor escalation review, not an independent diagnosis."
+    },
+    {
+      "code": "S13",
+      "enum_value": "S13_suicidal_ideation",
+      "name": "Suicidal ideation",
+      "severity": "High",
+      "definition": "Patient expresses thoughts of suicide, wishes to be dead, or describes contemplating ending their life — ranging from passive ideation ('I wish I weren't here') to active planning.",
+      "example_cues": [
+        "\"I've been thinking about killing myself.\"",
+        "\"I don't want to be alive anymore.\"",
+        "\"Everyone would be better off without me.\""
+      ],
+      "notes": "Label even passive ideation. This is the highest-priority signal. Do NOT require explicit statement of a plan — passive ideation counts."
+    },
+    {
+      "code": "S14",
+      "enum_value": "S14_substance_abuse",
+      "name": "Substance abuse",
+      "severity": "Low",
+      "definition": "Patient describes using alcohol, drugs, or other substances in a way that suggests problematic use — as a coping mechanism, in quantities that cause concern, or with negative consequences.",
+      "example_cues": [
+        "\"I've been drinking a lot more lately.\"",
+        "\"I use [substance] just to get through the day.\"",
+        "Describing blackouts, hangovers, or inability to stop."
+      ],
+      "notes": "Label use described as coping or problematic. Do not label casual or social use mentioned without distress context."
+    },
+    {
+      "code": "S15",
+      "enum_value": "S15_self_harm",
+      "name": "Self-harm",
+      "severity": "High",
+      "definition": "Patient describes deliberately injuring themselves (cutting, burning, hitting, etc.) or expresses urges to do so, distinct from suicidal intent.",
+      "example_cues": [
+        "\"I've been cutting again.\"",
+        "\"Sometimes I hurt myself just to feel something.\"",
+        "Describing physical self-injury as a coping mechanism."
+      ],
+      "notes": "Self-harm and suicidal ideation (S13) can co-occur but are distinct. Self-harm may be non-suicidal. Label both if applicable."
+    },
+    {
+      "code": "S16",
+      "enum_value": "S16_trauma_or_abuse",
+      "name": "Trauma or abuse",
+      "severity": "Medium",
+      "definition": "Patient discloses past or ongoing trauma — physical, emotional, sexual, or neglect-based abuse — or describes experiences consistent with PTSD-like symptoms (flashbacks, avoidance, hypervigilance).",
+      "example_cues": [
+        "Disclosure of childhood abuse or domestic violence.",
+        "\"I keep having nightmares about what happened.\"",
+        "Describing hypervigilance or feeling unsafe."
+      ],
+      "notes": "Label disclosures even if the patient minimizes them. Do not require formal trauma language — patient descriptions of distressing experiences count."
+    },
+    {
+      "code": "S17",
+      "enum_value": "S17_manic_or_hypomanic_episodes",
+      "name": "Manic / hypomanic episodes",
+      "severity": "High",
+      "definition": "Patient describes periods of abnormally elevated or irritable mood, dramatically decreased need for sleep, racing thoughts, grandiosity, impulsivity, or increased goal-directed activity inconsistent with baseline.",
+      "example_cues": [
+        "\"I only slept two hours and felt amazing.\"",
+        "\"I had so many ideas I couldn't stop — I stayed up for days.\"",
+        "Describing impulsive spending, sexual behavior, or risky decisions during a distinct period."
+      ],
+      "notes": "Distinguish from general excitement or happiness. Look for episodic nature and departure from baseline functioning."
+    },
+    {
+      "code": "S18",
+      "enum_value": "S18_psychotic_symptoms",
+      "name": "Psychotic symptoms",
+      "severity": "High",
+      "definition": "Patient describes experiences consistent with psychosis: hallucinations (hearing voices, seeing things), delusions (fixed false beliefs), disorganized thinking, or paranoia.",
+      "example_cues": [
+        "\"I hear voices telling me things.\"",
+        "\"I know they're watching me.\"",
+        "Describing beliefs or perceptions clearly disconnected from shared reality."
+      ],
+      "notes": "Be careful not to pathologize cultural or spiritual experiences. Requires clear indication of perceptual or belief disturbance beyond normal variation."
+    }
+  ]
+}

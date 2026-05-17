@@ -17,16 +17,27 @@ Each line in utterances.jsonl has the schema:
   }
 
 Usage:
+  # Run all splits (Train, Validation, Test):
   python src/preprocess.py
+
+  # Run a specific split:
+  python src/preprocess.py --split Validation
+  python src/preprocess.py --split Test
+  python src/preprocess.py --split Train
 """
 
 import os
 import re
 import json
+import argparse
 from typing import List, Dict
 from tqdm import tqdm
 from presidio_analyzer import AnalyzerEngine
 from presidio_anonymizer import AnonymizerEngine
+
+REPO_ROOT  = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+HOPE_DIR   = os.path.join(REPO_ROOT, "HOPE_WSDM_2022")
+ALL_SPLITS = ["Train", "Validation", "Test"]
 
 
 # ==========================================
@@ -152,7 +163,21 @@ def preprocess_transcripts(input_dir: str, output_dir: str) -> List[Dict]:
 # ==========================================
 
 if __name__ == "__main__":
-    INPUT_DIR  = r"C:\Users\samee\Documents\CHIEAC\HOPE_WSDM_2022\Train"
-    OUTPUT_DIR = r"C:\Users\samee\Documents\CHIEAC\processed"
+    parser = argparse.ArgumentParser(description="Preprocess HOPE transcript splits.")
+    parser.add_argument(
+        "--split",
+        choices=ALL_SPLITS,
+        default=None,
+        help="Which split to process. Omit to process all splits."
+    )
+    args = parser.parse_args()
 
-    preprocess_transcripts(INPUT_DIR, OUTPUT_DIR)
+    splits = [args.split] if args.split else ALL_SPLITS
+
+    for split in splits:
+        input_dir  = os.path.join(HOPE_DIR, split)
+        output_dir = os.path.join(REPO_ROOT, "processed", split)
+        print(f"\n{'='*50}")
+        print(f"Processing split: {split}")
+        print(f"{'='*50}")
+        preprocess_transcripts(input_dir, output_dir)

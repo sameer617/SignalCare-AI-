@@ -157,8 +157,26 @@ def process_train_folder(train_path: str, output_csv: str):
 # ==========================================
 
 if __name__ == "__main__":
-    FOLDER = r"C:\Users\samee\Documents\CHIEAC\HOPE_WSDM_2022\Train"
-    process_train_folder(
-        train_path=FOLDER,
-        output_csv="src/train_risk_signals.csv"
+    import argparse
+
+    REPO_ROOT  = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    ALL_SPLITS = ["Train", "Validation", "Test"]
+
+    parser = argparse.ArgumentParser(description="Generate transcript-level risk signal labels.")
+    parser.add_argument(
+        "--split",
+        choices=ALL_SPLITS,
+        default=None,
+        help="Which split to process. Omit to process all splits."
     )
+    args = parser.parse_args()
+
+    splits = [args.split] if args.split else ALL_SPLITS
+
+    for split in splits:
+        input_dir  = os.path.join(REPO_ROOT, "HOPE_WSDM_2022", split)
+        output_csv = os.path.join(REPO_ROOT, "src", f"{split.lower()}_risk_signals.csv")
+        print(f"\n{'='*50}")
+        print(f"Processing split: {split}")
+        print(f"{'='*50}")
+        process_train_folder(train_path=input_dir, output_csv=output_csv)
