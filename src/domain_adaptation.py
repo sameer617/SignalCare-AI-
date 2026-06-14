@@ -40,7 +40,7 @@ PROCESSED_DIR  = os.path.join(REPO_ROOT, "processed")
 OUTPUT_DIR     = os.path.join(REPO_ROOT, "models", "tsdae-adapted")
 ALL_SPLITS     = ["Train", "Validation", "Test"]
 
-BASE_MODEL     = "sentence-transformers/all-mpnet-base-v2"
+BASE_MODEL     = "bert-base-uncased"
 EPOCHS         = 1        # TSDAE authors use 1 epoch; increase only if loss hasn't converged
 BATCH_SIZE     = 8        # safe default; raise to 16 if GPU VRAM allows
 DELETION_RATIO = 0.6      # fraction of tokens deleted per sentence (TSDAE paper default)
@@ -151,7 +151,7 @@ def run_tsdae(
     train_loss = DenoisingAutoEncoderLoss(
         model,
         decoder_name_or_path=BASE_MODEL,
-        tie_encoder_decoder=True,
+        tie_encoder_decoder=False,
     )
 
     steps_per_epoch = len(train_dataloader)

@@ -225,10 +225,9 @@ SignalCareAI Project.pdf
 # Generated data and model artifacts (never commit)
 processed/
 models/
-src/train_risk_signals.csv
-src/validation_risk_signals.csv
-src/test_risk_signals.csv
+src/*_risk_signals.csv
 
 # Claude Code memory (local only)
 .claude/settings.local.json
 .claude/projects/
+.claude/scheduled_tasks.lock
