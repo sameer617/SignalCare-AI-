@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% block title %}{{ session.title }} - SignalCare AI{% endblock %}
+{% block content %}
+<h1>{{ session.title }}</h1>
+<p class="disclaimer">
+    SignalCare AI surfaces signals for a counselor to review &mdash; it is decision support,
+    not a diagnosis or crisis verdict.
+</p>
+
+<div class="session-layout"
+     data-session-id="{{ session.id }}"
+     data-status="{{ session.status }}"
+     data-taxonomy='{{ taxonomy | tojson }}'>
+
+    <div class="video-pane">
+        {% if session.status == "uploaded" %}
+        <p>This recording has not been analyzed yet.</p>
+        <form method="post" action="/sessions/{{ session.id }}/start-analysis">
+            <button type="submit" id="start-analysis-btn">Start Video and Analysis</button>
+        </form>
+        {% elif session.status == "processing" %}
+        <p id="processing-message">Processing recording&hellip; this can take a few minutes.</p>
+        {% elif session.status == "failed" %}
+        <p class="error">Analysis failed: {{ session.error_message }}</p>
+        {% else %}
+        <video id="player" controls preload="metadata" src="/sessions/{{ session.id }}/video"></video>
+        {% endif %}
+    </div>
+
+    {% if session.status == "ready" %}
+    <div class="analysis-pane">
+        <section class="session-signals">
+            <h2>Session signals</h2>
+            <div class="signal-badges">
+                <span class="badge" id="badge-S05" title="Emotional volatility">S05 volatility</span>
+                <span class="badge" id="badge-S08" title="Negative sentiment trend">S08 drift</span>
+                <span class="badge" id="badge-S09" title="Rumination patterns">S09 rumination</span>
+                <span class="badge" id="badge-S12" title="Escalation risk composite">S12 escalation</span>
+            </div>
+            <p id="sentiment-readout">Sentiment: <span id="sentiment-value">&ndash;</span></p>
+        </section>
+
+        <section class="transcript">
+            <h2>Transcript</h2>
+            <div id="transcript-lines"></div>
+        </section>
+    </div>
+    {% endif %}
+</div>
+
+{% if session.status == "ready" %}
+<script src="/static/js/session_player.js"></script>
+{% elif session.status == "processing" %}
+<script>
+    setTimeout(() => location.reload(), 5000);
+</script>
+{% endif %}
+{% endblock %}

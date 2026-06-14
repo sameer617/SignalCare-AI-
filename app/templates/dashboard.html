@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% block title %}Dashboard - SignalCare AI{% endblock %}
+{% block content %}
+<h1>Your sessions</h1>
+
+<section class="upload-card">
+    <h2>Upload a new session recording</h2>
+    <form method="post" action="/upload" enctype="multipart/form-data">
+        <label for="title">Session title</label>
+        <input type="text" id="title" name="title" placeholder="e.g. 2026-06-14 intake session" required>
+
+        <label for="video">Video file</label>
+        <input type="file" id="video" name="video" accept="video/*">
+
+        <p class="upload-or">&mdash; or &mdash;</p>
+
+        <label for="youtube_url">YouTube link</label>
+        <input type="url" id="youtube_url" name="youtube_url" placeholder="https://www.youtube.com/watch?v=...">
+
+        <p class="field-hint">Provide a video file or a YouTube link, not both.</p>
+
+        <button type="submit">Upload</button>
+    </form>
+</section>
+
+<section class="session-list">
+    {% if sessions %}
+    <table>
+        <thead>
+            <tr>
+                <th>Title</th>
+                <th>Status</th>
+                <th>Uploaded</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for session in sessions %}
+            <tr>
+                <td>{{ session.title }}</td>
+                <td><span class="status status-{{ session.status }}">{{ session.status }}</span></td>
+                <td>{{ session.created_at.strftime("%Y-%m-%d %H:%M") }}</td>
+                <td><a href="/sessions/{{ session.id }}">Open</a></td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <p>No sessions yet. Upload a recording to get started.</p>
+    {% endif %}
+</section>
+{% endblock %}

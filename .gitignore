@@ -227,6 +227,10 @@ processed/
 models/
 src/*_risk_signals.csv
 
+# Dashboard app — uploaded media + analysis output, local database
+media/
+signalcare.db
+
 # Claude Code memory (local only)
 .claude/settings.local.json
 .claude/projects/

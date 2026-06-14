@@ -1,0 +1,270 @@
+/* SignalCare AI — dashboard styles (v1, minimal) */
+
+:root {
+    --color-bg: #f7f8fa;
+    --color-text: #1f2933;
+    --color-muted: #6b7280;
+    --color-border: #d1d5db;
+    --color-accent: #2563eb;
+    --color-danger: #b91c1c;
+    --color-warn: #d97706;
+}
+
+* {
+    box-sizing: border-box;
+}
+
+body {
+    margin: 0;
+    font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+    background: var(--color-bg);
+    color: var(--color-text);
+}
+
+.topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.75rem 1.5rem;
+    background: white;
+    border-bottom: 1px solid var(--color-border);
+}
+
+.topbar .brand {
+    font-weight: 700;
+    font-size: 1.1rem;
+    color: var(--color-accent);
+    text-decoration: none;
+}
+
+.topbar nav {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    font-size: 0.9rem;
+}
+
+.user-email {
+    color: var(--color-muted);
+}
+
+.container {
+    max-width: 960px;
+    margin: 0 auto;
+    padding: 1.5rem;
+}
+
+.disclaimer {
+    color: var(--color-muted);
+    font-size: 0.9rem;
+    border-left: 3px solid var(--color-accent);
+    padding-left: 0.75rem;
+}
+
+/* Auth */
+
+.auth-card {
+    max-width: 360px;
+    margin: 3rem auto;
+    background: white;
+    border: 1px solid var(--color-border);
+    border-radius: 8px;
+    padding: 1.5rem;
+}
+
+.auth-card form {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.auth-switch {
+    margin-top: 1rem;
+    font-size: 0.9rem;
+}
+
+.error {
+    color: var(--color-danger);
+}
+
+/* Forms */
+
+label {
+    font-size: 0.85rem;
+    font-weight: 600;
+    margin-top: 0.5rem;
+}
+
+input, button {
+    padding: 0.5rem;
+    font-size: 1rem;
+    border: 1px solid var(--color-border);
+    border-radius: 4px;
+}
+
+button {
+    background: var(--color-accent);
+    color: white;
+    border: none;
+    cursor: pointer;
+    margin-top: 0.75rem;
+}
+
+button:hover {
+    opacity: 0.9;
+}
+
+/* Upload / session list */
+
+.upload-card {
+    background: white;
+    border: 1px solid var(--color-border);
+    border-radius: 8px;
+    padding: 1rem 1.5rem;
+    margin-bottom: 1.5rem;
+}
+
+.upload-card form {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    max-width: 480px;
+}
+
+.upload-or {
+    text-align: center;
+    color: var(--color-muted);
+    font-size: 0.85rem;
+    margin: 0.5rem 0 0;
+}
+
+.field-hint {
+    color: var(--color-muted);
+    font-size: 0.8rem;
+    margin: 0.25rem 0 0;
+}
+
+table {
+    width: 100%;
+    border-collapse: collapse;
+    background: white;
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+th, td {
+    text-align: left;
+    padding: 0.6rem 0.8rem;
+    border-bottom: 1px solid var(--color-border);
+}
+
+.status {
+    display: inline-block;
+    padding: 0.15rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.8rem;
+    text-transform: capitalize;
+}
+
+.status-uploaded { background: #e5e7eb; }
+.status-processing { background: #fef3c7; color: var(--color-warn); }
+.status-ready { background: #d1fae5; color: #047857; }
+.status-failed { background: #fee2e2; color: var(--color-danger); }
+
+/* Session view */
+
+.session-layout {
+    display: grid;
+    grid-template-columns: 2fr 1fr;
+    gap: 1.5rem;
+    margin-top: 1rem;
+}
+
+.video-pane video {
+    width: 100%;
+    border-radius: 8px;
+    background: black;
+}
+
+.analysis-pane {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.session-signals, .transcript {
+    background: white;
+    border: 1px solid var(--color-border);
+    border-radius: 8px;
+    padding: 1rem;
+}
+
+.signal-badges {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-bottom: 0.5rem;
+}
+
+.badge {
+    padding: 0.25rem 0.6rem;
+    border-radius: 999px;
+    font-size: 0.8rem;
+    background: #e5e7eb;
+    color: var(--color-muted);
+    cursor: default;
+}
+
+.badge.fired {
+    background: #fee2e2;
+    color: var(--color-danger);
+    font-weight: 600;
+}
+
+.transcript {
+    max-height: 480px;
+    overflow-y: auto;
+}
+
+.transcript-line {
+    padding: 0.4rem 0;
+    border-bottom: 1px solid #f0f0f0;
+    font-size: 0.95rem;
+}
+
+.transcript-line.sentiment-negative {
+    border-left: 3px solid var(--color-danger);
+    padding-left: 0.5rem;
+}
+
+.transcript-line.sentiment-positive {
+    border-left: 3px solid #047857;
+    padding-left: 0.5rem;
+}
+
+.transcript-line.sentiment-neutral {
+    border-left: 3px solid var(--color-border);
+    padding-left: 0.5rem;
+}
+
+.distress-tags {
+    margin-top: 0.25rem;
+    display: flex;
+    gap: 0.4rem;
+    flex-wrap: wrap;
+}
+
+.distress-tag {
+    font-size: 0.75rem;
+    background: #fef3c7;
+    color: var(--color-warn);
+    padding: 0.1rem 0.4rem;
+    border-radius: 4px;
+    cursor: default;
+}
+
+@media (max-width: 800px) {
+    .session-layout {
+        grid-template-columns: 1fr;
+    }
+}

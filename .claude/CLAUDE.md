@@ -355,6 +355,91 @@ There is no test suite yet — adding `pytest` tests under `tests/` is a future 
   S08 on 8/64 (~12.5%, unchanged), **S05 on 13/64 (~20%, down from ~44%)**, S09 on 4/64 (~6%,
   unchanged), **S12 on 5/64 (~8%, down from ~34%)**. All four signals now fall in a plausible
   "worth a counselor's attention" range. Threshold tuning is concluded.
+- `run_session_pipeline.py` — **new (Week 3, 2026-06-14), implemented, run on Validation**.
+  Production per-split session aggregation pipeline. For every transcript in a split: loads
+  patient turns from `utterances.jsonl`, runs the v1 embedder + sentiment MLP for
+  `SentimentTurn`s (reusing `build_embedding_model`/`load_sentiment_mlp`/
+  `predict_sentiment_turns` from `run_temporal_on_transcript.py`), calls
+  `distress_signal_inference.classify_utterances()` (NOT `utterance_labels.jsonl`, per Rule 6 —
+  this is the production path) for `DistressTurn`s, feeds both through a fresh
+  `SessionAnalyzer` per transcript, and writes one JSON record per patient turn to
+  `processed/<SPLIT>/session_signals.jsonl` (sentiment, distress signals + confidences,
+  drift/volatility/rumination/escalation scores + fired flags + confidences + contributing
+  codes). Usage: `python src/run_session_pipeline.py --split Validation [--limit N]`.
+  **Run on Validation (21 transcripts, 571 patient turns, ~2.5 min, ~48 batched API calls):**
+  S05 13.7%, S08 14.2%, S09 1.2%, S12 6.8% — consistent with the per-transcript tuning rates
+  (S05 ~20%, S08 ~12.5%, S09 ~6%, S12 ~8% on Transcript_13). 115/571 turns (20%) got >=1
+  distress signal from the OpenAI classifier; most common: S07 (45), S09_rumination (25, note:
+  this is the *text-based* LLM classification of rumination language, distinct from the
+  `SessionAnalyzer`-computed S09 rolling-window signal in the same record), S08 (21), S05 (21),
+  S04 (18). S13 (suicidal ideation) and S12 each appeared once. **Train (158 transcripts,
+  ~4906 utterances, ~410 API batches) and Test (42 transcripts, ~1085 utterances, ~91 API
+  batches) not yet run** — deferred pending cost/runtime approval.
+- `app/` — **new (2026-06-14), implemented**. FastAPI dashboard prototype, pulling forward part
+  of the Week 5/6 roadmap (Section 2) so the Week 1-3 pipeline has a demo surface. Stack:
+  FastAPI + SQLAlchemy/SQLite (`signalcare.db`, gitignored) + Jinja2 + vanilla JS, with
+  Starlette `SessionMiddleware` cookie-based auth (`SECRET_KEY` added to `.env`). Structure:
+  - `app/config.py`, `app/database.py`, `app/models.py` (`User`, `TherapySession`),
+    `app/auth.py` (bcrypt password hashing via passlib), `app/deps.py` (`get_db`,
+    `get_current_user`, `require_user`).
+  - `app/routers/auth_routes.py` — `/register`, `/login`, `/logout`.
+  - `app/routers/dashboard.py` — `/` (session list + upload form), `/upload`,
+    `/sessions/{id}` (video player + analysis dashboard), `/sessions/{id}/start-analysis`
+    (kicks off the pipeline via `BackgroundTasks`), `/sessions/{id}/status` (polling),
+    `/sessions/{id}/analysis.json`, `/sessions/{id}/video`.
+  - `app/pipeline/transcribe.py` — extracts audio with `ffmpeg-python` and transcribes via
+    OpenAI Whisper API (`whisper-1`, `response_format="verbose_json"`) to get timestamped
+    segments. **Known limitation:** Whisper does not diarize speakers, so v1 treats every
+    segment as a patient turn (documented in the module docstring; true speaker separation
+    deferred per Section 2).
+  - `app/pipeline/run_video_pipeline.py` — orchestrates the full per-segment pipeline by
+    importing (not modifying) existing `src/` modules: `redact_pii` (preprocess.py),
+    `build_embedding_model`/`load_sentiment_mlp`/`predict_sentiment_turns`
+    (run_temporal_on_transcript.py), `classify_utterances` (distress_signal_inference.py),
+    and a fresh `SessionAnalyzer` per video (session_analysis.py). Writes
+    `media/<user_id>/<session_id>/analysis.json` — one record per segment with the same
+    fields as `session_signals.jsonl` plus `start_time`/`end_time` from Whisper.
+  - `app/templates/` (base/login/register/dashboard/session) + `app/static/` —
+    `session_player.js` listens to the `<video>` element's `timeupdate`/`seeked` events and
+    progressively reveals transcript lines, sentiment, and S05/S08/S09/S12 badges (with
+    confidence + `taxonomy.json` definitions as tooltips) as `analysis.json` turns become due
+    — this is the "pre-process-then-replay" approach to the Section 2 live-dashboard vision,
+    chosen over true streaming ASR/WebSockets for now.
+  - Added to `requirements.txt`: `fastapi`, `uvicorn[standard]`, `sqlalchemy`, `jinja2`,
+    `python-multipart`, `passlib[bcrypt]`, `bcrypt==4.0.1` (pinned down from 5.x — passlib
+    1.7.4 is incompatible with bcrypt's removed `__about__` attribute in 4.1+/5.x), and
+    `ffmpeg-python`. Also installed `sentence-transformers==5.5.0` (was pinned in
+    `requirements.txt` but missing from the venv) and bumped the `scikit-learn` pin to
+    `1.9.0` to match what `sentence-transformers` actually resolved.
+  - `media/` (uploaded videos + `analysis.json`) and `signalcare.db` are gitignored.
+  - **Verified end-to-end**: register/login/logout, session-scoped upload, dashboard list with
+    status badges, session view states (uploaded/processing/failed/ready), and the
+    `start-analysis` background job + status transitions (`uploaded`→`processing`→`ready`/
+    `failed`) all work. **`ffmpeg` was previously missing from PATH** — confirmed via a test
+    upload that correctly reached `status="failed"` with a clear `[WinError 2]`/file-not-found
+    error surfaced in both the session view and `/status` endpoint, demonstrating the error
+    path works. **Resolved 2026-06-14**: installed via `winget install --id Gyan.FFmpeg -e`
+    (v8.1.1, full build). `ffmpeg` and `ffprobe` both confirmed on PATH
+    (`%LOCALAPPDATA%\Microsoft\WinGet\Links`, added to User PATH by winget).
+  - **YouTube link upload — new (2026-06-14), implemented.** The upload form
+    (`dashboard.html`) now accepts either a video file *or* a YouTube URL (mutually
+    exclusive — the route 400s if both or neither are provided). `/upload`
+    (`app/routers/dashboard.py`) downloads the video via the new
+    `app/pipeline/youtube_download.py` (`download_youtube_video`, using `yt-dlp`,
+    `format=bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best`,
+    `merge_output_format=mp4`) to `media/<user_id>/<session_id>/original.mp4`, identical to
+    a direct file upload — the rest of the pipeline (`run_video_pipeline.run_pipeline`) is
+    unmodified and reused as-is. Added `yt-dlp==2026.6.9` to `requirements.txt`.
+  - **Full video pipeline verified end-to-end (2026-06-14)** using a YouTube-downloaded clip
+    (~19s, "Me at the zoo"): download → ffmpeg audio extraction → Whisper transcription → PII
+    redaction → sentiment MLP → distress signal classification → `SessionAnalyzer` →
+    `analysis.json` (4 records) all completed correctly, status reached `ready`. This also
+    satisfies the previously-pending "real end-to-end video pipeline test" (see Still To Do).
+  - **PATH caveat for local dev**: `ffmpeg`/`ffprobe` are on the *User* PATH (added by
+    winget), but any shell/process started before that PATH update (e.g. an already-running
+    `uvicorn` background process) won't see them. Restart the dev server from a fresh shell
+    if `ffmpeg`-dependent steps fail with a file-not-found error despite ffmpeg being
+    installed.
 
 ### Still To Do
 - [ ] **Run `utterance_stats.ipynb`** to generate `utterances_with_signals.jsonl` — deferred to
@@ -365,14 +450,10 @@ There is no test suite yet — adding `pytest` tests under `tests/` is a future 
 - [ ] `TRAINING.md` — Week 2 baseline training plan.
 - [ ] Refactor `utils.py` — models reload on every call; add caching (`lru_cache`)
       and batch inference. Implement `load_hugging_face_model`.
-- [ ] **Week 3 — Session-level aggregation pipeline** (utterance predictions → session
-      signals, persisted output). `session_analysis.py` (S05/S08/S09/S12 logic) and
-      `run_temporal_on_transcript.py` (single-transcript validation CLI) exist; still needed:
-      a script that runs this over every transcript in a split (calling
-      `distress_signal_inference.classify_utterances()` instead of reading
-      `utterance_labels.jsonl`, since that file is LLM-labeled reference data per Rule 6, not
-      meant as a production dependency) and writes session-level results to
-      `processed/<SPLIT>/session_signals.jsonl`.
+- [ ] **Week 3 — Run session aggregation pipeline on Train/Test.** `run_session_pipeline.py`
+      is implemented and has been run on Validation (see below); still needed: run on Train
+      (158 transcripts, ~4906 utterances, ~410 API batches) and Test (42 transcripts, ~1085
+      utterances, ~91 API batches) once cost/runtime is approved.
 - [ ] Evaluation report with utterance-level + session-level metrics.
 - [ ] `tests/` — no test suite exists yet.
 
@@ -416,11 +497,34 @@ Transcript_13: S08 ~12.5% (unchanged), S05 ~20% (down from ~44%), S09 ~6% (uncha
 Synthetic benchmarks for both modules still pass (Scenario 2 in `session_analysis.py` updated
 to use 4 distinct co-occurring signals).
 
-**Next action (Week 3, continued): build the per-split session aggregation pipeline.** Write
-the script that runs the full S05/S08/S09/S12 pipeline (via `SessionAnalyzer`) over every
-transcript in a split, using `distress_signal_inference.classify_utterances()` rather than the
-LLM-labeled `utterance_labels.jsonl` (per Rule 6, since that file is reference data, not a
-production dependency), and writes `processed/<SPLIT>/session_signals.jsonl`.
+**Per-split session aggregation pipeline built and run on Validation (2026-06-14).**
+`run_session_pipeline.py` runs the full sentiment + distress + S05/S08/S09/S12 pipeline over
+every transcript in a split and writes `processed/<SPLIT>/session_signals.jsonl`. Run on
+Validation (21 transcripts, 571 turns): S05 13.7%, S08 14.2%, S09 1.2%, S12 6.8% — consistent
+with tuned per-transcript rates. See Section 9 Implemented for full details. **New file
+`src/run_session_pipeline.py` is uncommitted.**
+
+**Next action (Week 3, continued): run the pipeline on Train and Test splits**
+(`python src/run_session_pipeline.py --split Train` / `--split Test`), once cost/runtime
+(~410 / ~91 API batches respectively) is approved. Then commit
+`src/run_session_pipeline.py` + this CLAUDE.md update.
+
+**Dashboard prototype started ahead of schedule (2026-06-14).** Per user request, began the
+Week 5/6 application layer now so the Week 1-3 pipeline has a demo surface: new `app/` FastAPI
+package (auth, SQLite session/user storage, video upload, "Start Video and Analysis" ->
+background pipeline -> synced video/transcript/signal replay dashboard). See Section 9
+Implemented for the full breakdown. All routes/auth/upload/status flows are verified working.
+`ffmpeg`/`ffprobe` are now installed and on PATH (2026-06-14, via winget).
+
+**Dashboard: YouTube link upload added + full pipeline verified end-to-end (2026-06-14).**
+Per user request, the upload form now also accepts a YouTube URL as an alternative to a file
+upload (`app/pipeline/youtube_download.py`, `yt-dlp`); the rest of the pipeline is unchanged
+and reused as-is. Ran a full end-to-end test (YouTube download -> transcription -> redaction ->
+sentiment -> distress signals -> session analysis -> `analysis.json`, status `ready`) — this
+satisfies the previously-pending real end-to-end video pipeline test. This does not block Week
+3's remaining action (Train/Test session pipeline runs) — the two tracks are independent.
+**New/changed files uncommitted: `app/` (incl. `app/pipeline/youtube_download.py`),
+`src/run_session_pipeline.py`, `requirements.txt` (`yt-dlp` added), this CLAUDE.md update.**
 
 ---
 
