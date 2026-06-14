@@ -1,8 +1,7 @@
 # SignalCare AI
 
 **SignalCare AI** is a real-time NLP system that detects emotional distress markers in
-therapy-session transcripts to support — not replace — human counselors. It is being built
-for **CHIEAC**, a nonprofit, as an 8-week portfolio-grade project.
+therapy-session transcripts to support — not replace — human counselors. 
 
 ## What this is
 
