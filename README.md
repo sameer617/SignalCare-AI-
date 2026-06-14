@@ -244,22 +244,7 @@ artifacts.
 
 ---
 
-## Project status
 
-- ✅ Data preprocessing, PII redaction, transcript-level + utterance-level LLM labeling
-  (signals + sentiment) — run for all splits.
-- ✅ Sentiment classifier finalized.
-- ✅ Distress signal inference module (OpenAI-based).
-- ✅ Temporal + session-level signal modules (S05/S08/S09/S12), tuned and validated.
-- ✅ Per-split session aggregation pipeline — run on Validation; Train/Test pending.
-- ✅ FastAPI dashboard v1 — auth, upload (file or YouTube link), background analysis
-  pipeline, synced video/transcript/signal replay. Verified end-to-end.
-- ⏳ Run session aggregation pipeline on Train/Test splits.
-- ⏳ `utterance_stats.ipynb` EDA pass.
-- ⏳ Evaluation report (utterance-level + session-level metrics).
-- ⏳ Test suite.
-
----
 
 ## Ethics & limitations
 
@@ -269,3 +254,4 @@ artifacts.
 - Patient text is PII-redacted (Presidio) before being persisted or sent to any model.
 - Class imbalance is severe for several signals (some appear in only 1–6 transcripts);
   results should always be read alongside per-class metrics, not plain accuracy.
+REA
