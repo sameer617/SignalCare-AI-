@@ -11,12 +11,13 @@
         <a class="brand" href="/">SignalCare AI</a>
         {% if user %}
         <nav>
+            <a href="/how-it-works">How it works</a>
             <span class="user-email">{{ user.email }}</span>
             <a href="/logout">Log out</a>
         </nav>
         {% endif %}
     </header>
-    <main class="container">
+    <main class="container {% block container_class %}{% endblock %}">
         {% block content %}{% endblock %}
     </main>
 </body>

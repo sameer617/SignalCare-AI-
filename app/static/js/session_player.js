@@ -12,10 +12,20 @@
 
     const player = document.getElementById("player");
     const transcriptLines = document.getElementById("transcript-lines");
-    const sentimentValue = document.getElementById("sentiment-value");
+    const sentimentPill = document.getElementById("sentiment-pill");
+    const sentimentConfidence = document.getElementById("sentiment-confidence");
+    const sentimentTrend = document.getElementById("sentiment-trend");
+
+    const MAX_TREND_BARS = 40;
 
     let turns = [];
     let revealedCount = 0;
+
+    function severityClass(code) {
+        const entry = taxonomy[code];
+        const severity = entry ? entry.severity : null;
+        return severity ? "severity-" + severity.toLowerCase() : "severity-medium";
+    }
 
     function signalLabel(code) {
         const entry = taxonomy[code];
@@ -42,10 +52,10 @@
             tags.className = "distress-tags";
             turn.distress_signals.forEach((code) => {
                 const tag = document.createElement("span");
-                tag.className = "distress-tag";
                 const shortCode = code.split("_")[0];
                 const confidence = turn.distress_signal_confidence[code] || 0;
-                tag.textContent = `${shortCode} (${(confidence * 100).toFixed(0)}%)`;
+                tag.className = "distress-tag " + severityClass(shortCode);
+                tag.textContent = `${shortCode} — ${signalLabel(shortCode)} (${(confidence * 100).toFixed(0)}%)`;
                 tag.title = signalTooltip(shortCode, confidence);
                 tags.appendChild(tag);
             });
@@ -60,26 +70,51 @@
         const badge = document.getElementById("badge-" + code);
         if (!badge) return;
 
+        const stateEl = badge.querySelector(".badge-state");
         badge.classList.toggle("fired", !!fired);
 
         if (fired) {
             const codes = (contributingCodes || []).map((c) => c.split("_")[0]).join(", ");
             const confPct = (confidence * 100).toFixed(0);
+            stateEl.textContent = `Detected (${confPct}%)`;
             badge.title = `${signalLabel(code)} - confidence ${confPct}%` +
                 (codes ? ` - contributing: ${codes}` : "");
         } else {
+            stateEl.textContent = "Not detected";
             badge.title = signalLabel(code);
         }
     }
 
+    function updateSentimentTrend(sentiment) {
+        const bar = document.createElement("div");
+        bar.className = "sentiment-trend-bar sentiment-" + sentiment;
+        const heights = { positive: "100%", neutral: "55%", negative: "30%" };
+        bar.style.height = heights[sentiment] || "55%";
+        sentimentTrend.appendChild(bar);
+        while (sentimentTrend.children.length > MAX_TREND_BARS) {
+            sentimentTrend.removeChild(sentimentTrend.firstChild);
+        }
+    }
+
     function applyTurn(turn) {
-        sentimentValue.textContent =
-            `${turn.sentiment} (confidence ${(turn.sentiment_confidence * 100).toFixed(0)}%)`;
+        sentimentPill.textContent = turn.sentiment;
+        sentimentPill.className = "sentiment-pill sentiment-" + turn.sentiment;
+        sentimentConfidence.textContent =
+            `confidence ${(turn.sentiment_confidence * 100).toFixed(0)}%`;
+        updateSentimentTrend(turn.sentiment);
 
         updateBadge("S05", turn.volatility_fired, turn.volatility_confidence);
         updateBadge("S08", turn.drift_fired, turn.drift_confidence);
         updateBadge("S09", turn.rumination_fired, turn.rumination_confidence, turn.rumination_codes);
         updateBadge("S12", turn.escalation_fired, turn.escalation_confidence, turn.escalation_codes);
+    }
+
+    function resetSignals() {
+        sentimentPill.textContent = "–";
+        sentimentPill.className = "sentiment-pill";
+        sentimentConfidence.textContent = "";
+        sentimentTrend.innerHTML = "";
+        ["S05", "S08", "S09", "S12"].forEach((code) => updateBadge(code, false, 0));
     }
 
     function onTimeUpdate() {
@@ -96,6 +131,7 @@
         // Reset and re-reveal everything up to the new position, so seeking
         // backward/forward keeps the transcript + signals consistent.
         transcriptLines.innerHTML = "";
+        resetSignals();
         revealedCount = 0;
         onTimeUpdate();
     }

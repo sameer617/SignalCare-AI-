@@ -56,3 +56,26 @@ class TherapySession(Base):
     )
 
     user: Mapped["User"] = relationship(back_populates="sessions")
+    chat_messages: Mapped[list["ChatMessage"]] = relationship(
+        back_populates="session", cascade="all, delete-orphan"
+    )
+
+
+# ==========================================
+# 3. ChatMessage
+# ==========================================
+
+class ChatMessage(Base):
+    """A single message in a session's "ask about this session" chatbot history."""
+
+    __tablename__ = "chat_messages"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    session_id: Mapped[int] = mapped_column(ForeignKey("sessions.id"), nullable=False)
+    role: Mapped[str] = mapped_column(String, nullable=False)  # "user" | "assistant"
+    content: Mapped[str] = mapped_column(String, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, default=lambda: datetime.now(timezone.utc)
+    )
+
+    session: Mapped["TherapySession"] = relationship(back_populates="chat_messages")

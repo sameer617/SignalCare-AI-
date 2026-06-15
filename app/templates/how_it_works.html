@@ -1,0 +1,155 @@
+{% extends "base.html" %}
+{% block title %}How it works - SignalCare AI{% endblock %}
+{% block container_class %}container-wide{% endblock %}
+{% block content %}
+<div class="session-header">
+    <div>
+        <a class="back-link" href="/">&larr; All sessions</a>
+        <h1>How SignalCare AI works</h1>
+    </div>
+</div>
+<p class="disclaimer">
+    SignalCare AI surfaces signals for a counselor to review &mdash; it is decision support,
+    not a diagnosis or crisis verdict. Every signal below is a pattern flag with a confidence
+    score, intended to help a human reviewer notice things faster, not to replace their judgment.
+</p>
+
+<section class="howto-section">
+    <h2>Pipeline overview</h2>
+    <p>
+        When a session recording is analyzed, each patient turn moves through the same
+        pipeline, in order:
+    </p>
+    <ol class="howto-steps">
+        <li>
+            <strong>Transcription.</strong> The recording is transcribed into timestamped
+            segments (patient/therapist turns).
+        </li>
+        <li>
+            <strong>PII redaction.</strong> Names, locations, and other identifying details
+            are redacted from the transcript text before any further processing.
+        </li>
+        <li>
+            <strong>Sentiment scoring.</strong> Each patient turn is classified as
+            positive, negative, or neutral, with a confidence score.
+        </li>
+        <li>
+            <strong>Utterance-level distress signals (S01&ndash;S04, S06, S07, S10, S11,
+            S13&ndash;S18).</strong> Each patient turn is checked against the distress
+            signal taxonomy below, returning any signals present with a confidence score.
+        </li>
+        <li>
+            <strong>Temporal &amp; session-level signals (S05, S08, S09, S12).</strong> A
+            rolling window over recent turns recomputes emotional volatility, sentiment
+            drift, rumination, and the escalation composite after every new turn. See
+            "How the temporal signals work" below.
+        </li>
+    </ol>
+    <p>
+        On the session dashboard, this all happens turn-by-turn as the recording plays:
+        the transcript line, sentiment, and any fired signals for that turn appear together,
+        and the session-level badges (S05/S08/S09/S12) update live.
+    </p>
+</section>
+
+<section class="howto-section">
+    <h2>How the temporal signals work</h2>
+    <p>
+        S05, S08, S09, and S12 are not judged from a single utterance &mdash; they look at a
+        <strong>rolling window of the most recent 5 patient turns</strong> and recompute as
+        each new turn arrives. This mirrors how a counselor would notice a pattern: not from
+        one sentence, but from how the last few minutes of conversation have gone.
+    </p>
+
+    <div class="howto-signal">
+        <div class="howto-signal-header">
+            <span class="badge-dot severity-medium-dot"></span>
+            <h3>S08 &middot; Negative sentiment trend (drift)</h3>
+        </div>
+        <p>
+            Each turn's sentiment (positive / neutral / negative) is converted to a score
+            from -1 to +1, weighted by the model's confidence. Over the rolling window, a
+            linear regression line is fit to these scores. If the slope of that line is
+            <strong>steeper than -0.15</strong> &mdash; i.e. sentiment is consistently getting
+            worse turn over turn, not just dipping once &mdash; S08 fires.
+        </p>
+        <p class="howto-note">
+            S08 is suppressed when S05 (volatility) also fires in the same window, since a
+            single sharp emotional swing can otherwise produce a misleadingly negative slope
+            that isn't really a sustained "trend."
+        </p>
+    </div>
+
+    <div class="howto-signal">
+        <div class="howto-signal-header">
+            <span class="badge-dot severity-medium-dot"></span>
+            <h3>S05 &middot; Emotional volatility</h3>
+        </div>
+        <p>
+            For each pair of consecutive turns in the rolling window, the change in
+            sentiment score is computed. S05 fires when the
+            <strong>standard deviation of these turn-to-turn changes is &ge; 0.9</strong>
+            &mdash; meaning the patient's emotional tone is swinging sharply back and forth,
+            rather than moving smoothly in one direction.
+        </p>
+        <p class="howto-note">
+            This threshold was tuned against real session data so that S05 flags roughly the
+            most volatile fifth of turns, rather than firing on routine ups and downs.
+        </p>
+    </div>
+
+    <div class="howto-signal">
+        <div class="howto-signal-header">
+            <span class="badge-dot severity-low-dot"></span>
+            <h3>S09 &middot; Rumination patterns</h3>
+        </div>
+        <p>
+            Every patient turn is checked against the distress signal taxonomy
+            (S01&ndash;S18). S09 fires when the <strong>same distress signal code recurs in
+            at least 3 of the 5 turns</strong> in the rolling window &mdash; the patient is
+            repeatedly circling back to the same kind of distressing thought, rather than
+            mentioning it once and moving on.
+        </p>
+    </div>
+
+    <div class="howto-signal">
+        <div class="howto-signal-header">
+            <span class="badge-dot severity-critical-dot"></span>
+            <h3>S12 &middot; Escalation risk composite</h3>
+        </div>
+        <p>
+            S12 is a meta-signal: it never fires from a single signal alone. Within the
+            rolling window, all distinct distress signals with <strong>High or Medium
+            severity</strong> are collected (including S05/S08 themselves, if they are
+            firing on the current turn). If <strong>4 or more distinct</strong> such
+            signals co-occur within the window, S12 fires as a flag that overall session
+            risk has become elevated and may warrant closer review.
+        </p>
+        <p class="howto-note">
+            S12 is intentionally rare &mdash; it is meant to highlight sessions where
+            several different concerning patterns are converging, not to fire routinely.
+        </p>
+    </div>
+</section>
+
+<section class="howto-section">
+    <h2>Distress signal taxonomy (S01&ndash;S18)</h2>
+    <p>
+        These are the 18 patterns SignalCare AI looks for. Each has a severity tier
+        (Low / Medium / High) that controls how it is highlighted on the dashboard and
+        whether it counts toward the S12 escalation composite.
+    </p>
+    <div class="taxonomy-grid">
+        {% for code, sig in taxonomy.items() %}
+        <div class="taxonomy-card severity-{{ sig.severity.lower() }}">
+            <div class="taxonomy-card-header">
+                <span class="taxonomy-code">{{ code }}</span>
+                <span class="severity-pill severity-{{ sig.severity.lower() }}">{{ sig.severity }}</span>
+            </div>
+            <h3>{{ sig.name }}</h3>
+            <p>{{ sig.definition }}</p>
+        </div>
+        {% endfor %}
+    </div>
+</section>
+{% endblock %}

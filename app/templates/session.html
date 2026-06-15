@@ -1,7 +1,14 @@
 {% extends "base.html" %}
 {% block title %}{{ session.title }} - SignalCare AI{% endblock %}
+{% block container_class %}container-wide{% endblock %}
 {% block content %}
-<h1>{{ session.title }}</h1>
+<div class="session-header">
+    <div>
+        <a class="back-link" href="/">&larr; All sessions</a>
+        <h1>{{ session.title }}</h1>
+    </div>
+    <span class="status status-{{ session.status }}">{{ session.status }}</span>
+</div>
 <p class="disclaimer">
     SignalCare AI surfaces signals for a counselor to review &mdash; it is decision support,
     not a diagnosis or crisis verdict.
@@ -14,42 +21,93 @@
 
     <div class="video-pane">
         {% if session.status == "uploaded" %}
-        <p>This recording has not been analyzed yet.</p>
-        <form method="post" action="/sessions/{{ session.id }}/start-analysis">
-            <button type="submit" id="start-analysis-btn">Start Video and Analysis</button>
-        </form>
+        <div class="empty-state">
+            <p>This recording has not been analyzed yet.</p>
+            <form method="post" action="/sessions/{{ session.id }}/start-analysis">
+                <button type="submit" id="start-analysis-btn">Start Video and Analysis</button>
+            </form>
+        </div>
         {% elif session.status == "processing" %}
-        <p id="processing-message">Processing recording&hellip; this can take a few minutes.</p>
+        <div class="empty-state">
+            <div class="spinner"></div>
+            <p id="processing-message">Processing recording&hellip; this can take a few minutes.</p>
+        </div>
         {% elif session.status == "failed" %}
-        <p class="error">Analysis failed: {{ session.error_message }}</p>
+        <div class="empty-state">
+            <p class="error">Analysis failed: {{ session.error_message }}</p>
+        </div>
         {% else %}
         <video id="player" controls preload="metadata" src="/sessions/{{ session.id }}/video"></video>
         {% endif %}
     </div>
 
     {% if session.status == "ready" %}
-    <div class="analysis-pane">
+    <aside class="signals-pane">
         <section class="session-signals">
             <h2>Session signals</h2>
+            <p class="section-hint">Updates live as the recording plays</p>
             <div class="signal-badges">
-                <span class="badge" id="badge-S05" title="Emotional volatility">S05 volatility</span>
-                <span class="badge" id="badge-S08" title="Negative sentiment trend">S08 drift</span>
-                <span class="badge" id="badge-S09" title="Rumination patterns">S09 rumination</span>
-                <span class="badge" id="badge-S12" title="Escalation risk composite">S12 escalation</span>
+                <div class="badge severity-high" id="badge-S05" data-code="S05">
+                    <span class="badge-dot"></span>
+                    <span class="badge-label">S05 &middot; Emotional volatility</span>
+                    <span class="badge-state">Not detected</span>
+                </div>
+                <div class="badge severity-medium" id="badge-S08" data-code="S08">
+                    <span class="badge-dot"></span>
+                    <span class="badge-label">S08 &middot; Negative sentiment trend</span>
+                    <span class="badge-state">Not detected</span>
+                </div>
+                <div class="badge severity-low" id="badge-S09" data-code="S09">
+                    <span class="badge-dot"></span>
+                    <span class="badge-label">S09 &middot; Rumination patterns</span>
+                    <span class="badge-state">Not detected</span>
+                </div>
+                <div class="badge severity-critical" id="badge-S12" data-code="S12">
+                    <span class="badge-dot"></span>
+                    <span class="badge-label">S12 &middot; Escalation risk composite</span>
+                    <span class="badge-state">Not detected</span>
+                </div>
             </div>
-            <p id="sentiment-readout">Sentiment: <span id="sentiment-value">&ndash;</span></p>
         </section>
 
-        <section class="transcript">
-            <h2>Transcript</h2>
-            <div id="transcript-lines"></div>
+        <section class="sentiment-card">
+            <h2>Current sentiment</h2>
+            <div class="sentiment-readout">
+                <span class="sentiment-pill" id="sentiment-pill">&ndash;</span>
+                <span class="sentiment-confidence" id="sentiment-confidence"></span>
+            </div>
+            <div class="sentiment-trend" id="sentiment-trend" aria-hidden="true"></div>
         </section>
+    </aside>
+
+    <section class="transcript">
+        <div class="transcript-header">
+            <h2>Transcript</h2>
+            <span class="section-hint">Patient turns, redacted &amp; analyzed in real time</span>
+        </div>
+        <div id="transcript-lines" class="transcript-lines"></div>
+    </section>
+
+    <div class="chat-widget" id="chat-widget">
+        <button class="chat-toggle" id="chat-toggle" aria-label="Ask about this session">&#128172;</button>
+        <div class="chat-panel" id="chat-panel" hidden>
+            <div class="chat-header">
+                <span>Ask about this session</span>
+                <button class="chat-close" id="chat-close" aria-label="Close">&times;</button>
+            </div>
+            <div class="chat-messages" id="chat-messages"></div>
+            <form class="chat-input-form" id="chat-form">
+                <input type="text" id="chat-input" placeholder="Ask a question..." autocomplete="off">
+                <button type="submit">Send</button>
+            </form>
+        </div>
     </div>
     {% endif %}
 </div>
 
 {% if session.status == "ready" %}
 <script src="/static/js/session_player.js"></script>
+<script src="/static/js/session_chat.js"></script>
 {% elif session.status == "processing" %}
 <script>
     setTimeout(() => location.reload(), 5000);

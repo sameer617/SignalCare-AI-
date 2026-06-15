@@ -11,18 +11,23 @@ Usage:
 import json
 import os
 import shutil
+import sys
 
 from fastapi import APIRouter, BackgroundTasks, Depends, Form, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
-from app.config import MEDIA_DIR, REPO_ROOT
+from app.config import MEDIA_DIR, REPO_ROOT, SRC_DIR
 from app.database import SessionLocal
 from app.deps import get_current_user, get_db, require_user
-from app.models import TherapySession, User
+from app.models import ChatMessage, TherapySession, User
 from app.pipeline.run_video_pipeline import run_pipeline
 from app.pipeline.youtube_download import download_youtube_video
+
+sys.path.insert(0, SRC_DIR)
+from session_chatbot import answer_question, build_session_context  # noqa: E402
 
 router = APIRouter()
 templates = Jinja2Templates(directory="app/templates")
@@ -48,6 +53,16 @@ def index(request: Request, user: User | None = Depends(get_current_user), db: S
     )
     return templates.TemplateResponse(
         "dashboard.html", {"request": request, "user": user, "sessions": sessions}
+    )
+
+
+@router.get("/how-it-works", response_class=HTMLResponse)
+def how_it_works(request: Request, user: User | None = Depends(get_current_user)) -> HTMLResponse:
+    """Explains the signal taxonomy and the temporal-signal mechanism."""
+    taxonomy = _load_taxonomy()
+    return templates.TemplateResponse(
+        "how_it_works.html",
+        {"request": request, "user": user, "taxonomy": taxonomy},
     )
 
 
@@ -119,11 +134,15 @@ def _get_owned_session(session_id: int, user: User, db: Session) -> TherapySessi
 
 
 def _load_taxonomy() -> dict:
-    """Loads taxonomy.json and returns a dict mapping signal code -> {name, definition}."""
+    """Loads taxonomy.json and returns a dict mapping signal code -> {name, definition, severity}."""
     with open(TAXONOMY_PATH, "r", encoding="utf-8") as f:
         data = json.load(f)
     return {
-        sig["code"]: {"name": sig["name"], "definition": sig["definition"]}
+        sig["code"]: {
+            "name": sig["name"],
+            "definition": sig["definition"],
+            "severity": sig["severity"],
+        }
         for sig in data["signals"]
     }
 
@@ -233,3 +252,69 @@ def session_video(
     session = _get_owned_session(session_id, user, db)
     video_path = os.path.join(MEDIA_DIR, str(user.id), str(session.id), session.video_filename)
     return FileResponse(video_path)
+
+
+# ==========================================
+# 6. Chatbot
+# ==========================================
+
+class ChatRequest(BaseModel):
+    """Request body for posting a new chat message."""
+    message: str
+
+
+@router.get("/sessions/{session_id}/chat")
+def get_chat_history(
+    session_id: int,
+    user: User = Depends(require_user),
+    db: Session = Depends(get_db),
+) -> JSONResponse:
+    """Returns the saved chat history for a session, oldest first."""
+    session = _get_owned_session(session_id, user, db)
+
+    messages = (
+        db.query(ChatMessage)
+        .filter(ChatMessage.session_id == session.id)
+        .order_by(ChatMessage.created_at)
+        .all()
+    )
+    return JSONResponse({
+        "messages": [{"role": m.role, "content": m.content} for m in messages]
+    })
+
+
+@router.post("/sessions/{session_id}/chat")
+def post_chat_message(
+    session_id: int,
+    chat_request: ChatRequest,
+    user: User = Depends(require_user),
+    db: Session = Depends(get_db),
+) -> JSONResponse:
+    """Answers a question about a session using its analysis results, and
+    persists both the question and the reply to the session's chat history."""
+    session = _get_owned_session(session_id, user, db)
+    if session.status != "ready":
+        raise HTTPException(status_code=409, detail="Analysis is not ready yet.")
+
+    analysis_path = os.path.join(MEDIA_DIR, str(user.id), str(session.id), "analysis.json")
+    with open(analysis_path, "r", encoding="utf-8") as f:
+        records = json.load(f)
+
+    taxonomy = _load_taxonomy()
+    context = build_session_context(records, session.title, taxonomy)
+
+    history_rows = (
+        db.query(ChatMessage)
+        .filter(ChatMessage.session_id == session.id)
+        .order_by(ChatMessage.created_at)
+        .all()
+    )
+    history = [(m.role, m.content) for m in history_rows]
+
+    reply = answer_question(context, history, chat_request.message)
+
+    db.add(ChatMessage(session_id=session.id, role="user", content=chat_request.message))
+    db.add(ChatMessage(session_id=session.id, role="assistant", content=reply))
+    db.commit()
+
+    return JSONResponse({"reply": reply})
