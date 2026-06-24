@@ -1,0 +1,42 @@
+# Raw dataset and generated data (never needed in the image)
+HOPE_WSDM_2022/
+processed/
+
+# Model artifacts not used by the live pipeline (kept locally only)
+models/sentiment-v1*
+models/sentiment-v2*
+models/sentiment-v3*
+models/sentiment-v4-ensemble/v4_ensemble_mlp128*
+models/tsdae-adapted-roberta/
+
+# MLflow tracking data
+mlruns/
+mlartifacts/
+mlflow.db
+
+# App runtime data (created on the instance, not baked into the image)
+media/
+signalcare.db
+
+# yt-dlp cookies file (mounted at runtime, not baked into the image)
+cookies.txt
+
+# Environment / secrets
+.env
+.venv
+venv/
+
+# VCS / editor / docs
+.git/
+.gitignore
+.claude/
+*.md
+
+# Python
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# Notebooks
+*.ipynb
+.ipynb_checkpoints/

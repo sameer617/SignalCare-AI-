@@ -111,6 +111,7 @@ def build_model(base_model: str) -> SentenceTransformer:
 def run_tsdae(
     sentences: List[str],
     output_dir: str,
+    base_model: str = BASE_MODEL,
     epochs: int = EPOCHS,
     batch_size: int = BATCH_SIZE,
     deletion_ratio: float = DELETION_RATIO,
@@ -121,6 +122,7 @@ def run_tsdae(
     Args:
         sentences:      List of training sentences.
         output_dir:     Directory to save the adapted model.
+        base_model:     HuggingFace model name or local path to adapt.
         epochs:         Number of training epochs.
         batch_size:     Per-device training batch size.
         deletion_ratio: Fraction of tokens to delete for the noise function.
@@ -132,8 +134,8 @@ def run_tsdae(
         handlers=[LoggingHandler()],
     )
 
-    print(f"\nBuilding model from: {BASE_MODEL}")
-    model = build_model(BASE_MODEL)
+    print(f"\nBuilding model from: {base_model}")
+    model = build_model(base_model)
 
     print(f"Corpus size: {len(sentences):,} sentences")
     print(f"Epochs: {epochs} | Batch size: {batch_size} | Deletion ratio: {deletion_ratio}")
@@ -150,7 +152,7 @@ def run_tsdae(
 
     train_loss = DenoisingAutoEncoderLoss(
         model,
-        decoder_name_or_path=BASE_MODEL,
+        decoder_name_or_path=base_model,
         tie_encoder_decoder=False,
     )
 
@@ -212,6 +214,12 @@ def sanity_check(model_dir: str) -> None:
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="TSDAE domain adaptation on HOPE corpus.")
     parser.add_argument(
+        "--base-model",
+        type=str,
+        default=BASE_MODEL,
+        help=f"HuggingFace model name or local path to adapt (default: {BASE_MODEL}).",
+    )
+    parser.add_argument(
         "--epochs",
         type=int,
         default=EPOCHS,
@@ -254,6 +262,7 @@ if __name__ == "__main__":
     run_tsdae(
         sentences=sentences,
         output_dir=args.output_dir,
+        base_model=args.base_model,
         epochs=args.epochs,
         batch_size=args.batch_size,
         deletion_ratio=args.deletion_ratio,

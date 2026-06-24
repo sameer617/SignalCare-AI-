@@ -5,11 +5,12 @@ Week 3: Per-split session aggregation pipeline.
 
 For every transcript in a split, this script:
   1. Loads patient turns from processed/<SPLIT>/utterances.jsonl.
-  2. Encodes each turn's text with bert-base-uncased + mean pooling (v1
-     embeddings) and runs the final sentiment MLP
-     (models/sentiment-v1-mlp-d05-wd3/) to get a SentimentTurn per turn
-     (S05/S08 input) -- reuses build_embedding_model / load_sentiment_mlp /
-     predict_sentiment_turns from run_temporal_on_transcript.py.
+  2. Encodes each turn's text with TWO embedders (v1 raw bert-base-uncased +
+     v2 TSDAE domain-adapted bert-base-uncased, concatenated to 1536-dim) and
+     runs the final sentiment MLP (models/sentiment-v4-ensemble/) to get a
+     SentimentTurn per turn (S05/S08 input) -- reuses build_embedding_model /
+     build_tsdae_embedding_model / load_sentiment_mlp / predict_sentiment_turns
+     from run_temporal_on_transcript.py.
   3. Calls distress_signal_inference.classify_utterances() to get a
      DistressTurn per turn (S09/S12 input). Unlike
      run_temporal_on_transcript.py (which reads utterance_labels.jsonl for
@@ -43,6 +44,7 @@ from distress_signal_inference import classify_utterances, DistressSignalResult
 from session_analysis import SessionAnalyzer, DistressTurn
 from run_temporal_on_transcript import (
     build_embedding_model,
+    build_tsdae_embedding_model,
     load_sentiment_mlp,
     predict_sentiment_turns,
 )
@@ -112,7 +114,10 @@ def run_pipeline(split: str, limit: int = None) -> None:
     print(f"\nLoading {build_embedding_model.__module__}'s bert-base-uncased embedder (v1)...")
     embedder = build_embedding_model()
 
-    print("Loading sentiment MLP (models/sentiment-v1-mlp-d05-wd3/)...")
+    print("Loading TSDAE domain-adapted embedder (v2)...")
+    tsdae_embedder = build_tsdae_embedding_model()
+
+    print("Loading sentiment MLP (models/sentiment-v4-ensemble/)...")
     mlp = load_sentiment_mlp()
 
     out_path = os.path.join(PROCESSED_DIR, split, "session_signals.jsonl")
@@ -125,7 +130,7 @@ def run_pipeline(split: str, limit: int = None) -> None:
             turn_ids, texts = zip(*turns)
             texts = list(texts)
 
-            sentiment_turns = predict_sentiment_turns(embedder, mlp, texts)
+            sentiment_turns = predict_sentiment_turns(embedder, mlp, texts, tsdae_embedder)
             distress_results: List[DistressSignalResult] = classify_utterances(
                 texts, batch_size=DISTRESS_BATCH_SIZE
             )

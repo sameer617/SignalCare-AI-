@@ -6,7 +6,7 @@ Full analysis pipeline for an uploaded session video.
 For a single video file, this:
   1. Transcribes the video with timestamps (app.pipeline.transcribe).
   2. Redacts PII from each segment's text (src/preprocess.redact_pii).
-  3. Runs the v1 sentiment MLP on each segment (src/run_temporal_on_transcript).
+  3. Runs the v4 ensemble sentiment MLP on each segment (src/run_temporal_on_transcript).
   4. Classifies distress signals S01-S18 for each segment
      (src/distress_signal_inference.classify_utterances).
   5. Feeds both sequences through a fresh SessionAnalyzer
@@ -44,6 +44,7 @@ from distress_signal_inference import classify_utterances, DistressSignalResult 
 from preprocess import redact_pii  # noqa: E402
 from run_temporal_on_transcript import (  # noqa: E402
     build_embedding_model,
+    build_tsdae_embedding_model,
     load_sentiment_mlp,
     predict_sentiment_turns,
 )
@@ -79,8 +80,9 @@ def run_pipeline(video_path: str, output_path: str) -> None:
     ]
 
     embedder = build_embedding_model()
+    tsdae_embedder = build_tsdae_embedding_model()
     mlp = load_sentiment_mlp()
-    sentiment_turns = predict_sentiment_turns(embedder, mlp, redacted_texts)
+    sentiment_turns = predict_sentiment_turns(embedder, mlp, redacted_texts, tsdae_embedder)
 
     distress_results: list[DistressSignalResult] = classify_utterances(
         redacted_texts, batch_size=DISTRESS_BATCH_SIZE

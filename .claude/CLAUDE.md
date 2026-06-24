@@ -287,6 +287,49 @@ There is no test suite yet — adding `pytest` tests under `tests/` is a future 
   close to the practical ceiling for this embedding + LLM-labeled-data combination (see Rule 6).
   v1 (raw BERT) consistently outperformed v2 (TSDAE-adapted) across every classifier head —
   TSDAE domain adaptation did not help this downstream task.
+- `train_sentiment_v2_experiments.py` / `train_sentiment_v3_roberta.py` / `train_sentiment_v4_ensemble.py`
+  — **new (2026-06-14/15), run — sentiment classifier re-opened and reconcluded with a new
+  FINAL model.** Follow-up to push past v1's 0.7933 Validation accuracy toward the 0.80 target,
+  using MLflow (experiment `signalcare-sentiment-v2`, SQLite backend at `mlflow.db`) and
+  confusion-matrix plot artifacts for every run.
+  - **Track A/B (`train_sentiment_v2_experiments.py`, v2 = TSDAE bert-base-uncased
+    embeddings)**: 15 configs across oversampling (RandomOverSampler/SMOTE), deeper
+    BatchNorm+label-smoothing MLPs ([256,64]/[128,64]), and a round-2 hyperparameter sweep
+    around the best deep config. Best: **`v2_deep_mlp256-64_d0.5_wd0.001_ls0.1`** —
+    Validation=0.7846 (Test=0.7512), +2.45pt over the v2 baseline (0.7601) but still below
+    v1 (0.7933) and the 0.80 target.
+  - **Track C (`train_sentiment_v3_roberta.py`, v3 = TSDAE-adapted roberta-base)**: re-ran
+    `domain_adaptation.py --base-model roberta-base` (required adding `--base-model` support —
+    previously hardcoded; also required installing missing pinned deps `nltk==3.9.4` and
+    `datasets==4.8.5`), producing `models/tsdae-adapted-roberta/` (820 steps, 1 epoch, ~1.5hr).
+    Sanity-check cosine similarities (0.9810 similar-pair vs 0.9548 dissimilar-pair) showed a
+    much smaller separation than bert-base TSDAE, foreshadowing weak embeddings. MLP[128]
+    d0.5 wd1e-3 head: **Validation=0.7023, Test=0.6931** — clearly worse than both v1 and v2;
+    TSDAE on roberta-base degraded this downstream task even more than TSDAE on bert-base-uncased.
+  - **Track D (`train_sentiment_v4_ensemble.py`, v4 = v1+v2 concatenated embeddings,
+    1536-dim)**: concatenating raw bert-base-uncased (v1) and TSDAE bert-base-uncased (v2)
+    embeddings — both already cached, so effectively free — and sweeping 3 MLP head configs.
+    **Winner: `v4_ensemble_mlp256-64_d0.5_wd0.001_ls0.1`** (hidden_dims=[256,64], BatchNorm,
+    dropout=0.5, weight_decay=1e-3, label_smoothing=0.1, class-weighted CE) —
+    **Validation=0.8091 (Test=0.7668)** — the first and only config across all ~20 tried
+    (v1, v2 baseline + 15 experiments, v3/roberta, v4 x3) to clear the **0.80 Validation
+    target**. Positive-class F1 on Validation also improved to 0.67 (vs. 0.55–0.64 in prior
+    configs). Saved to `models/sentiment-v4-ensemble/` (`model.pt` + `metrics.json` +
+    per-config JSON results + confusion matrix plots under `plots/<run_name>/`).
+  - **New FINAL sentiment model: v4 ensemble (`models/sentiment-v4-ensemble/`)**, superseding
+    `models/sentiment-v1-mlp-d05-wd3/`. At inference time this requires encoding each
+    utterance with BOTH the raw bert-base-uncased model (v1) AND the TSDAE-adapted
+    bert-base-uncased model (`models/tsdae-adapted/`, v2), concatenating the two 768-dim
+    embeddings into a 1536-dim vector, then running the MLP[256,64] head. Test accuracy
+    (0.7668) is slightly below v1's Test (0.7742) and below the Validation number — the
+    Val/Test gap is larger for this config than for v1, consistent with the larger (1536-dim)
+    input having more capacity to fit Validation-specific noise; still the best Validation
+    result obtained and the only one to meet the stated 0.80 target.
+  - `domain_adaptation.py` now supports `--base-model <name>` (was previously hardcoded to
+    the module-level `BASE_MODEL` constant) — used for the roberta-base run above, kept for
+    future base-model experiments. `requirements.txt`/venv: `mlflow`, `imbalanced-learn`,
+    `nltk==3.9.4`, `datasets==4.8.5` installed (the latter two were pinned but missing).
+    `.gitignore` updated for `mlruns/`, `mlartifacts/`, `mlflow.db`.
 - `distress_signal_inference.py` — **new (2026-06-13), implemented**. Reusable inference module
   for utterance-level distress signal (S01–S18) classification via GPT-4o-mini structured output
   (`temperature=0`), per the decision below. Exposes `classify_utterance(text)` (single) and
@@ -460,12 +503,41 @@ There is no test suite yet — adding `pytest` tests under `tests/` is a future 
 ### Current Position
 Week 2 in progress. `preprocess.py`, `label.py`, `risk_taxonomy.py`, and
 `sentiment_labeling.py` have run for all splits. TSDAE domain adaptation has run with the
-target `bert-base-uncased` config. The sentiment classifier is **concluded**: after comparing
-logistic regression, random forest, XGBoost, and PyTorch MLP heads (with a dropout/weight-decay
-sweep) across v1 (raw BERT) and v2 (TSDAE-adapted) embeddings, the final model is
-**v1 + MLP[128], dropout=0.5, weight_decay=1e-3** (Validation=0.7933, Test=0.7742, saved to
-`models/sentiment-v1-mlp-d05-wd3/`) — just under the 0.80 target, treated as the practical
-ceiling for this embedding + LLM-labeled-data setup (see Section 9).
+target `bert-base-uncased` config (and, as of 2026-06-15, also a `roberta-base` config —
+see below).
+
+**Sentiment classifier re-opened and reconcluded (2026-06-15) — new FINAL model.**
+The original conclusion (v1 + MLP[128], Validation=0.7933, just under the 0.80 target) was
+revisited with ~20 further experiments (MLflow-tracked, experiment
+`signalcare-sentiment-v2`, confusion matrices plotted for every run — see Section 9
+Implemented for full details):
+- v2 (TSDAE bert-base-uncased) classifier-head tuning (oversampling, deeper BatchNorm/label-
+  smoothing MLPs, round-2 sweep): best Validation=0.7846 — improved over v2's baseline but
+  still below v1.
+- v3 (TSDAE roberta-base, new domain-adapted model at `models/tsdae-adapted-roberta/`):
+  Validation=0.7023 — worse than both v1 and v2. TSDAE domain adaptation continues to hurt
+  this downstream task regardless of base model.
+- **v4 (ensemble: v1 raw-BERT embeddings concatenated with v2 TSDAE-BERT embeddings, 1536-dim,
+  MLP[256,64] + BatchNorm + dropout=0.5 + weight_decay=1e-3 + label_smoothing=0.1)** —
+  **Validation=0.8091, Test=0.7668** — the only config to clear the 0.80 Validation target.
+
+**New FINAL sentiment model: v4 ensemble, `models/sentiment-v4-ensemble/`** (supersedes
+`models/sentiment-v1-mlp-d05-wd3/`). Inference requires both the raw bert-base-uncased
+embedder (v1) and the TSDAE-adapted bert-base-uncased embedder (`models/tsdae-adapted/`, v2);
+concatenate their 768-dim outputs into 1536-dim before the MLP head.
+
+**Wired into the live pipeline (2026-06-15).** `run_temporal_on_transcript.py` now exposes
+`build_tsdae_embedding_model()` alongside `build_embedding_model()`, and
+`load_sentiment_mlp()`/`predict_sentiment_turns()` were updated for the v4 architecture
+(`MODEL_DIR=models/sentiment-v4-ensemble/`, `EMBEDDING_DIM=1536`, `HIDDEN_DIMS=[256,64]`,
+`USE_BATCHNORM=True`, `SentimentMLP`/`SENTIMENT_LABELS` now imported from
+`train_sentiment_v2_experiments` which supports `use_batchnorm`).
+`predict_sentiment_turns()` takes an additional `tsdae_embedder` argument, encodes with both
+embedders, and concatenates before calling the MLP. `run_session_pipeline.py` and
+`app/pipeline/run_video_pipeline.py` (which reuse these functions unchanged) were updated to
+build and pass the second embedder. Verified end-to-end on Validation/Transcript_13 (64 turns)
+— S08 ~16%, S05 ~14%, S09 ~6%, S12 ~8%, consistent with the pre-v4 tuned rates (S08 ~12.5%,
+S05 ~20%, S09 ~6%, S12 ~8%). All three call sites import cleanly.
 
 **Distress signal classifier (S01–S18, multi-label) — abandoned (2026-06-13).** An embedding-based
 multi-label MLP (BCE loss, sqrt-scaled + capped pos_weight for the severe imbalance) was tried on

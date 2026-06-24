@@ -227,9 +227,17 @@ processed/
 models/
 src/*_risk_signals.csv
 
+# MLflow tracking data (local only)
+mlruns/
+mlartifacts/
+mlflow.db
+
 # Dashboard app — uploaded media + analysis output, local database
 media/
 signalcare.db
+
+# yt-dlp cookies file (YouTube auth — sensitive, never commit)
+cookies.txt
 
 # Claude Code memory (local only)
 .claude/settings.local.json

@@ -41,6 +41,12 @@ pandas==3.0.1
 matplotlib==3.10.9
 seaborn==0.13.2
 
+# Experiment tracking (optional, dev-only — needed for
+# src/train_sentiment_v2_experiments.py, v3, v4. Not installed in the
+# Docker image. mlflow==3.13.0 requires pandas<3, which conflicts with the
+# pandas==3.0.1 pin above, so install separately if running these scripts:
+#   pip install mlflow==3.13.0
+
 # Progress / config
 tqdm==4.67.3
 python-dotenv==1.2.1
@@ -60,4 +66,4 @@ passlib[bcrypt]==1.7.4
 bcrypt==4.0.1
 itsdangerous==2.2.0
 ffmpeg-python==0.2.0
-yt-dlp==2026.6.9
+pytubefix>=9.0.0

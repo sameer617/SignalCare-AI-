@@ -24,7 +24,6 @@ from app.database import SessionLocal
 from app.deps import get_current_user, get_db, require_user
 from app.models import ChatMessage, TherapySession, User
 from app.pipeline.run_video_pipeline import run_pipeline
-from app.pipeline.youtube_download import download_youtube_video
 
 sys.path.insert(0, SRC_DIR)
 from session_chatbot import answer_question, build_session_context  # noqa: E402
@@ -74,19 +73,12 @@ def how_it_works(request: Request, user: User | None = Depends(get_current_user)
 def upload_video(
     title: str = Form(...),
     video: UploadFile = None,
-    youtube_url: str = Form(""),
     user: User = Depends(require_user),
     db: Session = Depends(get_db),
 ) -> RedirectResponse:
-    """Saves an uploaded video (file or YouTube link) and creates a session
-    row with status='uploaded'."""
-    youtube_url = youtube_url.strip()
-    has_file = video is not None and bool(video.filename)
-
-    if not has_file and not youtube_url:
-        raise HTTPException(status_code=400, detail="Provide a video file or a YouTube link.")
-    if has_file and youtube_url:
-        raise HTTPException(status_code=400, detail="Provide either a video file or a YouTube link, not both.")
+    """Saves an uploaded video file and creates a session row with status='uploaded'."""
+    if video is None or not video.filename:
+        raise HTTPException(status_code=400, detail="Please provide a video file.")
 
     session = TherapySession(
         user_id=user.id,
@@ -101,19 +93,11 @@ def upload_video(
     session_dir = os.path.join(MEDIA_DIR, str(user.id), str(session.id))
     os.makedirs(session_dir, exist_ok=True)
 
-    if has_file:
-        ext = os.path.splitext(video.filename)[1] or ".mp4"
-        video_filename = f"original{ext}"
-        dest_path = os.path.join(session_dir, video_filename)
-        with open(dest_path, "wb") as out_file:
-            shutil.copyfileobj(video.file, out_file)
-    else:
-        try:
-            video_filename = download_youtube_video(youtube_url, session_dir)
-        except Exception as exc:  # pylint: disable=broad-except
-            db.delete(session)
-            db.commit()
-            raise HTTPException(status_code=400, detail=f"Could not download YouTube video: {exc}") from exc
+    ext = os.path.splitext(video.filename)[1] or ".mp4"
+    video_filename = f"original{ext}"
+    dest_path = os.path.join(session_dir, video_filename)
+    with open(dest_path, "wb") as out_file:
+        shutil.copyfileobj(video.file, out_file)
 
     session.video_filename = video_filename
     db.commit()

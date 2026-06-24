@@ -6,9 +6,13 @@ transcript.
 
 Pipeline for a single transcript:
   1. Load patient turns from processed/<SPLIT>/utterances.jsonl.
-  2. Encode each turn's text with bert-base-uncased + mean pooling (v1
-     embeddings, matching train_sentiment_v1.py / train_sentiment_mlp.py).
-  3. Run the final sentiment MLP (models/sentiment-v1-mlp-d05-wd3/) to get a
+  2. Encode each turn's text with TWO embedders and concatenate:
+     - v1: raw bert-base-uncased + mean pooling (matching train_sentiment_v1.py)
+     - v2: TSDAE domain-adapted bert-base-uncased (models/tsdae-adapted/,
+       matching train_sentiment_v2.py)
+     into a single 1536-dim vector (v4 ensemble, matching
+     train_sentiment_v4_ensemble.py).
+  3. Run the final sentiment MLP (models/sentiment-v4-ensemble/) to get a
      sentiment label + confidence per turn -> SentimentTurn (S05/S08 input).
   4. Load the matching turns' distress signal labels from
      processed/<SPLIT>/utterance_labels.jsonl (LLM-generated via label.py,
@@ -29,6 +33,7 @@ import json
 import argparse
 from typing import Dict, List, Tuple
 
+import numpy as np
 import torch
 from sentence_transformers import SentenceTransformer
 from sentence_transformers.sentence_transformer.modules import Transformer, Pooling
@@ -37,18 +42,24 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from risk_taxonomy import RiskSignal
 from session_analysis import SessionAnalyzer, DistressTurn
 from temporal_analysis import SentimentTurn
-from train_sentiment_mlp import SentimentMLP, SENTIMENT_LABELS, HIDDEN_DIMS, DROPOUT
+from sentiment_model import SentimentMLP, SENTIMENT_LABELS
 
 
 # ==========================================
 # 1. Constants
 # ==========================================
 
-REPO_ROOT     = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-PROCESSED_DIR = os.path.join(REPO_ROOT, "processed")
-MODEL_DIR     = os.path.join(REPO_ROOT, "models", "sentiment-v1-mlp-d05-wd3")
-BASE_MODEL    = "bert-base-uncased"
-EMBEDDING_DIM = 768
+REPO_ROOT       = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+PROCESSED_DIR   = os.path.join(REPO_ROOT, "processed")
+MODEL_DIR       = os.path.join(REPO_ROOT, "models", "sentiment-v4-ensemble")
+TSDAE_MODEL_DIR = os.path.join(REPO_ROOT, "models", "tsdae-adapted")
+BASE_MODEL      = "bert-base-uncased"
+
+# v4 ensemble: v1 (raw BERT, 768) concatenated with v2 (TSDAE BERT, 768) = 1536
+EMBEDDING_DIM = 1536
+HIDDEN_DIMS   = [256, 64]
+DROPOUT       = 0.5
+USE_BATCHNORM = True
 
 
 # ==========================================
@@ -119,10 +130,23 @@ def build_embedding_model() -> SentenceTransformer:
     return SentenceTransformer(modules=[word_embedding_model, pooling_model])
 
 
+def build_tsdae_embedding_model() -> SentenceTransformer:
+    """
+    Loads the v2 (TSDAE domain-adapted bert-base-uncased) embedding model from
+    models/tsdae-adapted/, matching train_sentiment_v2.py.
+
+    Returns:
+        SentenceTransformer ready for inference.
+    """
+    return SentenceTransformer(TSDAE_MODEL_DIR)
+
+
 def load_sentiment_mlp() -> SentimentMLP:
     """
-    Loads the finalized sentiment classifier head (v1 + MLP[128], dropout=0.5,
-    weight_decay=1e-3) from models/sentiment-v1-mlp-d05-wd3/.
+    Loads the finalized sentiment classifier head — v4 ensemble
+    (v1 + v2 embeddings concatenated to 1536-dim, MLP[256, 64] with BatchNorm,
+    dropout=0.5, weight_decay=1e-3, label_smoothing=0.1) — from
+    models/sentiment-v4-ensemble/.
 
     Returns:
         SentimentMLP in eval mode.
@@ -132,6 +156,7 @@ def load_sentiment_mlp() -> SentimentMLP:
         hidden_dims=HIDDEN_DIMS,
         num_classes=len(SENTIMENT_LABELS),
         dropout=DROPOUT,
+        use_batchnorm=USE_BATCHNORM,
     )
     state_dict = torch.load(os.path.join(MODEL_DIR, "model.pt"), map_location="cpu")
     model.load_state_dict(state_dict)
@@ -144,20 +169,27 @@ def load_sentiment_mlp() -> SentimentMLP:
 # ==========================================
 
 def predict_sentiment_turns(
-    embedder: SentenceTransformer, mlp: SentimentMLP, texts: List[str]
+    embedder: SentenceTransformer,
+    mlp: SentimentMLP,
+    texts: List[str],
+    tsdae_embedder: SentenceTransformer = None,
 ) -> List[SentimentTurn]:
     """
     Encodes texts and runs the sentiment MLP to produce SentimentTurn records.
 
     Args:
-        embedder: v1 embedding model.
-        mlp: Trained sentiment MLP classifier head.
+        embedder: v1 (raw bert-base-uncased) embedding model.
+        mlp: Trained sentiment MLP classifier head (v4 ensemble, expects 1536-dim input).
         texts: Patient turn texts, in chronological order.
+        tsdae_embedder: v2 (TSDAE domain-adapted) embedding model. Required for the
+            v4 ensemble — its output is concatenated with `embedder`'s output.
 
     Returns:
         List of SentimentTurn, one per input text, in order.
     """
-    embeddings = embedder.encode(texts, batch_size=16, show_progress_bar=True, convert_to_numpy=True)
+    v1_embeddings = embedder.encode(texts, batch_size=16, show_progress_bar=True, convert_to_numpy=True)
+    v2_embeddings = tsdae_embedder.encode(texts, batch_size=16, show_progress_bar=True, convert_to_numpy=True)
+    embeddings = np.concatenate([v1_embeddings, v2_embeddings], axis=1)
 
     with torch.no_grad():
         logits = mlp(torch.tensor(embeddings, dtype=torch.float32))
@@ -196,11 +228,14 @@ if __name__ == "__main__":
     print(f"\nLoading {BASE_MODEL} embedder (v1, no domain adaptation)...")
     embedder = build_embedding_model()
 
-    print("Loading sentiment MLP (models/sentiment-v1-mlp-d05-wd3/)...")
+    print(f"Loading TSDAE domain-adapted embedder (v2, {TSDAE_MODEL_DIR})...")
+    tsdae_embedder = build_tsdae_embedding_model()
+
+    print("Loading sentiment MLP (models/sentiment-v4-ensemble/)...")
     mlp = load_sentiment_mlp()
 
     print("\nEncoding + classifying patient turns...")
-    sentiment_turns = predict_sentiment_turns(embedder, mlp, list(texts))
+    sentiment_turns = predict_sentiment_turns(embedder, mlp, list(texts), tsdae_embedder)
     distress_turns = [distress_by_turn_id.get(tid, DistressTurn(signals=[])) for tid in turn_ids]
 
     print("\nRunning SessionAnalyzer over the session...")

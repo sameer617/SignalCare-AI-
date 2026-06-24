@@ -253,4 +253,41 @@ artifacts.
 - Patient text is PII-redacted (Presidio) before being persisted or sent to any model.
 - Class imbalance is severe for several signals (some appear in only 1–6 transcripts);
   results should always be read alongside per-class metrics, not plain accuracy.
-REA
+
+---
+
+## Deployment (Docker / EC2)
+
+The app ships with a `Dockerfile` and `docker-compose.yml` for deploying the dashboard
+(e.g. to an AWS EC2 instance).
+
+```bash
+# Build and run
+docker compose up --build -d
+
+# Then visit http://<host>:8000
+```
+
+`media/` and `signalcare.db` are mounted as volumes so uploaded videos, analysis results,
+and user accounts persist across container restarts. `.env` (with `OPENAI_API_KEY` and
+`SECRET_KEY`) is loaded via `env_file`.
+
+### YouTube upload fails on EC2 ("Sign in to confirm you're not a bot")
+
+YouTube blocks requests from cloud/datacenter IP ranges (including AWS EC2) with a
+"Sign in to confirm you're not a bot" error. When this happens, the YouTube-link upload
+fails with this message surfaced in the dashboard.
+
+**Fix:** give `yt-dlp` cookies from a logged-in YouTube session so it authenticates like a
+real browser:
+
+1. In a browser where you're logged into YouTube, export cookies with a "Get cookies.txt
+   LOCALLY" extension (Chrome/Firefox), for the `youtube.com` domain.
+2. Copy the exported file to the repo root on the EC2 instance as `cookies.txt`
+   (gitignored — never commit this file).
+3. In `docker-compose.yml`, uncomment the `YT_DLP_COOKIES_FILE` environment line and the
+   `cookies.txt` volume mount.
+4. Rebuild/restart: `docker compose up --build -d`.
+
+Cookies expire periodically — if the bot-check error returns after a while, re-export a
+fresh `cookies.txt` and restart the container.
